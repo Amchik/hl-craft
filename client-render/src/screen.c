@@ -87,8 +87,6 @@ static void R_Screen_DrawTriangle_AsCamera(struct R_Screen *screen,
     vec2_t vs2d[3];
     for (int j = 0; j < 3; ++j) {
         vs2d[j] = R_Triag_3D_to_2D(vpos[j], &screen->calc);
-        printf("point(%f, %f) of space(%f %f %f)\n", vs2d[j].x, vs2d[j].y,
-               triangle->v[j].x, triangle->v[j].y, triangle->v[j].z);
     }
 
     // Draw wireframe because im lazy
