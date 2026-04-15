@@ -72,6 +72,8 @@ struct R_Block gravel_block = {
     .faces = &gravel_block_faces,
 };
 struct R_PolyVec polyvec;
+#define CHUNKS_COUNT 1
+struct R_Chunk CHUNKS[CHUNKS_COUNT];
 
 struct client_state {
     struct wl_display *display;
@@ -241,8 +243,8 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
     //    }
 
     polyvec.vec.size = 0;
-    for (int i = 0; i < 6; ++i) {
-        R_Block_MakeFacePolys(&polyvec, &gravel_block, i, (ivec3_t){0, 0, 0});
+    for (int i = 0; i < CHUNKS_COUNT; ++i) {
+        R_Chunk_MakeBlockFaces(&polyvec, CHUNKS + i);
     }
 
     struct R_Screen screen;
@@ -471,6 +473,33 @@ int main() {
         gravel_block_faces.face[i] = texture_gravel;
     }
     polyvec = R_PolyVec_Init();
+    for (int i = 0; i < CHUNKS_COUNT; ++i) {
+        struct R_Chunk *c = CHUNKS + i;
+        c->pos = (ivec3_t){i, 0, 0};
+        c->data = malloc(sizeof(*c->data));
+        for (int x = 0; x < 16; ++x) {
+            for (int y = 0; y < 16; ++y) {
+                for (int z = 0; z < 16; ++z) {
+                    c->data->blocks[x][y][z].block_type = R_BTYPE_AIR;
+                    c->data->blocks[x][y][z].faces = 0;
+                }
+            }
+        }
+    }
+    CHUNKS[0].data->blocks[0][0][0].block_type = R_BTYPE_SOLID;
+    CHUNKS[0].data->blocks[0][0][0].faces = &gravel_block_faces;
+    CHUNKS[0].data->blocks[0][1][0].block_type = R_BTYPE_SOLID;
+    CHUNKS[0].data->blocks[0][1][0].faces = &gravel_block_faces;
+    for (int x = 1; x < 9; ++x) {
+        for (int z = 1; z < 11; ++z) {
+            for (int y = 1; y < 3; ++y) {
+                if (y == 1 || (x == 1 || x == 8 || z == 1 || z == 10)) {
+                    CHUNKS[0].data->blocks[x][y][z].block_type = R_BTYPE_SOLID;
+                    CHUNKS[0].data->blocks[x][y][z].faces = &gravel_block_faces;
+                }
+            }
+        }
+    }
     // ---
 
     struct client_state state = {0};

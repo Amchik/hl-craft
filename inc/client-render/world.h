@@ -17,11 +17,13 @@ struct R_Block {
 struct R_Chunk {
     // Some big data that requires heap allocation
     struct {
-        // [x*16 + z][y]
-        struct R_Block blocks[256][16];
+        // [x][y][z]
+        struct R_Block blocks[16][16][16];
     } *data;
     ivec3_t pos;
 };
 
 void R_Block_MakeFacePolys(struct R_PolyVec *vec, struct R_Block *block,
                            enum R_Face face, ivec3_t block_pos);
+
+void R_Chunk_MakeBlockFaces(struct R_PolyVec *vec, const struct R_Chunk *chunk);

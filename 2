@@ -82,18 +82,11 @@ void R_Block_MakeFacePolys(struct R_PolyVec *vec, struct R_Block *block,
     R_PolyVec_Push(vec, &t2);
 }
 
-static const ivec3_t FACE_OFFSET_MAP[6] = {
-    [R_FACE_TOP] = {0, 1, 0}, [R_FACE_BOTTOM] = {0, -1, 0},
-    [R_FACE_PP] = {1, 0, 0},  [R_FACE_PN] = {0, 0, 1},
-    [R_FACE_NP] = {-1, 0, 0}, [R_FACE_NN] = {0, 0, -1},
+const ivec3_t FACE_OFFSET_MAP[6] = {
+    [R_FACE_TOP] = {0, 0, 0},
 };
 
-#define CHECK_BOUNDS(w, dr) !((w == 0 && dr.w == -1) || (w == 15 && dr.w == 1))
-#define CHECK_BOUNDS_XYZ(x, y, z, dr)                                          \
-    (CHECK_BOUNDS(x, dr) && CHECK_BOUNDS(y, dr) && CHECK_BOUNDS(z, dr))
-
-void R_Chunk_MakeBlockFaces(struct R_PolyVec *vec,
-                            const struct R_Chunk *chunk) {
+void R_Chunk_MakeBlockFaces(struct R_PolyVec *vec, const struct R_Chunk *chunk) {
     for (int x = 0; x < 16; ++x) {
         for (int z = 0; z < 16; ++z) {
             for (int y = 0; y < 16; ++y) {
@@ -101,14 +94,7 @@ void R_Chunk_MakeBlockFaces(struct R_PolyVec *vec,
                 if (b->block_type == R_BTYPE_AIR)
                     continue;
                 for (int i = 0; i < 6; ++i) {
-                    ivec3_t dr = FACE_OFFSET_MAP[i];
-                    if (!CHECK_BOUNDS_XYZ(x, y, z, dr))
-                        continue;
-                    struct R_Block *nb =
-                        &chunk->data->blocks[x + dr.x][y + dr.y][z + dr.z];
-                    if (nb->block_type != R_BTYPE_AIR)
-                        continue;
-                    R_Block_MakeFacePolys(vec, b, i, (ivec3_t){x, y, z});
+                    return;
                 }
             }
         }
