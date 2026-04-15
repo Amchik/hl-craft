@@ -14,13 +14,13 @@ enum R_TextureTriagPlace {
 };
 
 enum R_Face {
-    R_FACE_TOP,
-    R_FACE_BOTTOM,
+    R_FACE_TOP = 0,
+    R_FACE_BOTTOM = 1,
     // positive/negative x/z
-    R_FACE_PP,
-    R_FACE_PN,
-    R_FACE_NP,
-    R_FACE_NN,
+    R_FACE_PP = 2,
+    R_FACE_PN = 3,
+    R_FACE_NP = 4,
+    R_FACE_NN = 5,
 };
 
 struct R_BlockFaces {

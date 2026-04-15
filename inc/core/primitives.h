@@ -1,5 +1,9 @@
 #pragma once
 
+/* Some note: avec (any vec) stores any type and used only as base for
+ * other vectors.
+ */
+
 #include <stdlib.h>
 
 typedef struct {

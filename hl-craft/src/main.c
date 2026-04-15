@@ -1,6 +1,7 @@
 #include "client-render/scene.h"
 #include "client-render/screen.h"
 #include "client-render/texture.h"
+#include "client-render/world.h"
 #include "core/vector.h"
 #include "input-helper.h"
 #include "xdg-shell-client-protocol.h"
@@ -64,6 +65,12 @@ uint32_t gravel[] = {
     0x959595, 0x979797, 0x999999, 0xBFBFBF,
 };
 struct R_Texture16x16 texture_gravel = {.texture = gravel};
+struct R_BlockFaces gravel_block_faces;
+struct R_Block gravel_block = {
+    .block_type = R_BTYPE_SOLID,
+    .faces = &gravel_block_faces,
+};
+struct R_PolyVec polyvec;
 
 struct client_state {
     struct wl_display *display;
@@ -128,8 +135,8 @@ uint64_t current_time_ms() {
 struct R_Triangle TRIANGLES[TRIAG_CNT + 0] = {
     {.v = {{0, 0, 0}, {1, 0, 0}, {1, 0, 1}}, .t = {{0, 0}, {1, 0}, {1, 1}}},
     {.v = {{0, 0, 0}, {1, 0, 1}, {0, 0, 1}}, .t = {{0, 0}, {1, 1}, {0, 1}}},
-    {.v = {{0, 0, 0}, {1, -1, 0}, {1, 0, 0}}, .t = {{0, 0}, {1, 1}, {1, 0}}},
     {.v = {{0, 0, 0}, {0, -1, 0}, {1, -1, 0}}, .t = {{0, 0}, {0, 1}, {1, 1}}},
+    {.v = {{0, 0, 0}, {1, -1, 0}, {1, 0, 0}}, .t = {{0, 0}, {1, 1}, {0, 1}}},
     {.v = {{0, 0, 0}, {0, 0, 1}, {0, -1, 1}}, .t = {{0, 0}, {1, 0}, {1, 1}}},
     {.v = {{0, 0, 0}, {0, -1, 1}, {0, -1, 0}}, .t = {{0, 0}, {1, 1}, {0, 1}}}};
 
@@ -225,26 +232,22 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
     memset(work_buffer, 0, WIDTH * HEIGHT * 4);
     memcpy(z_buffer, z_buffer_INF, WIDTH * HEIGHT * sizeof(float));
 
-    struct R_Triangle triangles[TRIAG_CNT];
-    memcpy(triangles, TRIANGLES, sizeof(TRIANGLES));
-    for (int i = 0; i < TRIAG_CNT; ++i) {
-        triangles[i].color = 0 * 0xFFFFFF;
-        triangles[i].texture = &texture_gravel;
+//    struct R_Triangle triangles[TRIAG_CNT];
+//    memcpy(triangles, TRIANGLES, sizeof(TRIANGLES));
+//    for (int i = 0; i < TRIAG_CNT; ++i) {
+//        triangles[i].color = 0 * 0xFFFFFF;
+//        triangles[i].texture = &texture_gravel;
+//    }
+
+    polyvec.vec.size = 0;
+    for (int i = 0; i < 6; ++i) {
+        R_Block_MakeFacePolys(&polyvec, &gravel_block, i, (ivec3_t){0, 0, 0});
     }
-    triangles[5].color = 0xFFFFFF;
-    struct R_Triangle triang;
-    triang.v[0] = (vec3_t){1, 0, 1};
-    triang.v[1] = (vec3_t){2, 0, 1};
-    triang.v[2] = (vec3_t){2, 0, 2};
-    triang.t[0] = (tvec2_t){0, 0};
-    triang.t[1] = (tvec2_t){1, 0};
-    triang.t[2] = (tvec2_t){1, 1};
-    triang.color = 0xFFFFFF;
-    triang.texture = &texture_gravel;
 
     struct R_Screen screen;
     R_Screen_FromSceneProps(&screen, &sprops, work_buffer, z_buffer);
-    R_Screen_DrawTriangles(&screen, triangles, TRIAG_CNT);
+    R_Screen_DrawTriangles(&screen, polyvec.vec.ptr, R_PolyVec_Len(&polyvec));
+    // R_Screen_DrawTriangles(&screen, triangles, TRIAG_CNT);
     // R_Screen_DrawTriangles(&screen, &triang, 1);
 
     draw_text(work_buffer, 0, WIDTH, HEIGHT,
@@ -426,6 +429,10 @@ int main() {
     for (int i = 0; i < WIDTH * HEIGHT; ++i) {
         z_buffer_INF[i] = INFINITY;
     }
+    for (int i = 0; i < 6; ++i) {
+        gravel_block_faces.face[i] = texture_gravel;
+    }
+    polyvec = R_PolyVec_Init();
     // ---
 
     struct client_state state = {0};
