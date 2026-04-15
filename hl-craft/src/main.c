@@ -333,8 +333,8 @@ void on_pointer_motion(void *data, struct wl_pointer *wl_pointer, uint32_t time,
             pointer_prev_y = wl_fixed_to_int(surface_y);
             return;
         }
-        int x = wl_fixed_to_int(surface_x)   ;
-        int y = wl_fixed_to_int(surface_y)   ;
+        int x = wl_fixed_to_int(surface_x);
+        int y = wl_fixed_to_int(surface_y);
         sprops.yaw += (x - pointer_prev_x) * 0.3f;
         sprops.pitch += -(y - pointer_prev_y) * 0.3f;
         if (sprops.yaw > 180.)
