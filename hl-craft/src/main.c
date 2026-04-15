@@ -454,6 +454,7 @@ int main() {
     xdg_surface_add_listener(state.xdg_surface, &xdg_surface_listener, &state);
 
     state.xdg_toplevel = xdg_surface_get_toplevel(state.xdg_surface);
+    xdg_toplevel_set_app_id(state.xdg_toplevel, "org.ceheki.hlcraft");
     xdg_toplevel_set_title(state.xdg_toplevel, "HL-Craft Indev");
 
     wl_surface_commit(state.surface);
