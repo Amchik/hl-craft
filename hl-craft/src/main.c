@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <wayland-client-core.h>
 #include <wayland-client.h>
+#include <wayland-util.h>
 #include <xkbcommon/xkbcommon-keysyms.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -232,12 +233,12 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
     memset(work_buffer, 0, WIDTH * HEIGHT * 4);
     memcpy(z_buffer, z_buffer_INF, WIDTH * HEIGHT * sizeof(float));
 
-//    struct R_Triangle triangles[TRIAG_CNT];
-//    memcpy(triangles, TRIANGLES, sizeof(TRIANGLES));
-//    for (int i = 0; i < TRIAG_CNT; ++i) {
-//        triangles[i].color = 0 * 0xFFFFFF;
-//        triangles[i].texture = &texture_gravel;
-//    }
+    //    struct R_Triangle triangles[TRIAG_CNT];
+    //    memcpy(triangles, TRIANGLES, sizeof(TRIANGLES));
+    //    for (int i = 0; i < TRIAG_CNT; ++i) {
+    //        triangles[i].color = 0 * 0xFFFFFF;
+    //        triangles[i].texture = &texture_gravel;
+    //    }
 
     polyvec.vec.size = 0;
     for (int i = 0; i < 6; ++i) {
@@ -318,6 +319,43 @@ void on_keyboard_input(void *data, struct wl_keyboard *wl_keyboard,
     case '=':
         sprops.fov += 5;
         break;
+    }
+}
+
+int pointer_prev_x = -1, pointer_prev_y = -1;
+bool pointer_button_pressed = false;
+
+void on_pointer_motion(void *data, struct wl_pointer *wl_pointer, uint32_t time,
+                       wl_fixed_t surface_x, wl_fixed_t surface_y) {
+    if (pointer_button_pressed) {
+        if (pointer_prev_x == -1) {
+            pointer_prev_x = wl_fixed_to_int(surface_x);
+            pointer_prev_y = wl_fixed_to_int(surface_y);
+            return;
+        }
+        int x = wl_fixed_to_int(surface_x)   ;
+        int y = wl_fixed_to_int(surface_y)   ;
+        sprops.yaw += (x - pointer_prev_x) * 0.3f;
+        sprops.pitch += -(y - pointer_prev_y) * 0.3f;
+        if (sprops.yaw > 180.)
+            sprops.yaw -= 360.;
+        if (sprops.yaw < -180.)
+            sprops.yaw += 360.;
+        if (sprops.pitch > 90.)
+            sprops.pitch = 90.;
+        if (sprops.pitch < -90.)
+            sprops.pitch = -90.;
+        pointer_prev_x = x;
+        pointer_prev_y = y;
+    }
+}
+void on_pointer_button(void *data, struct wl_pointer *wl_pointer,
+                       uint32_t serial, uint32_t time, uint32_t button,
+                       uint32_t state) {
+    pointer_button_pressed = !!state;
+    if (!state) {
+        pointer_prev_x = -1;
+        pointer_prev_y = -1;
     }
 }
 
@@ -464,6 +502,8 @@ int main() {
 
     ih.data = &state;
     ih.keyboard_keysym = on_keyboard_input;
+    ih.pointer_motion = on_pointer_motion;
+    ih.pointer_button = on_pointer_button;
 
     // Event loop
     state.render_since = 0;
