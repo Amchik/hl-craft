@@ -1,14 +1,14 @@
 #pragma once
 
-#include "client-render/texture.h"
 #include "core/vector.h"
+#include "core/texture.h"
 #include <math.h>
 
 struct R_Triangle {
     vec3_t v[3];
     tvec2_t t[3];
     uint32_t color;
-    struct R_Texture16x16 *texture;
+    const struct AbstractTextureRef *texture;
 };
 
 struct R_SceneProps {

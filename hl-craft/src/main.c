@@ -1,8 +1,10 @@
 #include "client-render/scene.h"
 #include "client-render/screen.h"
-#include "client-render/texture.h"
 #include "client-render/world.h"
+#include "core/texture.h"
 #include "core/vector.h"
+#include "core/world/chunk.h"
+#include "core/world/visible_world.h"
 #include "input-helper.h"
 #include "xdg-shell-client-protocol.h"
 #include <X11/keysymdef.h>
@@ -65,15 +67,19 @@ uint32_t gravel[] = {
     0x9F9F9F, 0x838383, 0x909090, 0xC7C7C7, 0x7B7B7B, 0xC7C7C7, 0x9D9D9D,
     0x959595, 0x979797, 0x999999, 0xBFBFBF,
 };
-struct R_Texture16x16 texture_gravel = {.texture = gravel};
-struct R_BlockFaces gravel_block_faces;
-struct R_Block gravel_block = {
-    .block_type = R_BTYPE_SOLID,
+struct AbstractTextureRef texture_gravel = {
+    ._texture = {._ty_16x16 = {.texture = gravel}},
+    ._texture_ty = TEXTURE_TYPE_16X16};
+struct BlockFaces gravel_block_faces;
+struct Block gravel_block = {
+    .block_type = BLOCKTYPE_SOLID,
     .faces = &gravel_block_faces,
 };
-struct R_PolyVec polyvec;
-#define CHUNKS_COUNT 1
-struct R_Chunk CHUNKS[CHUNKS_COUNT];
+
+#define CHUNKS_COUNT 2
+struct R_ChunkInstance CHUNKS[CHUNKS_COUNT];
+
+struct VisibleWorld *WORLD;
 
 struct client_state {
     struct wl_display *display;
@@ -244,7 +250,11 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
 
     struct R_Screen screen;
     R_Screen_FromSceneProps(&screen, &sprops, work_buffer, z_buffer);
-    R_Screen_DrawTriangles(&screen, polyvec.vec.ptr, R_PolyVec_Len(&polyvec));
+    for (int i = 0; i < CHUNKS_COUNT; ++i) {
+        struct R_PolyVec *polyvec = &CHUNKS[i].mesh->polys;
+        R_Screen_DrawTriangles(&screen, polyvec->vec.ptr,
+                               R_PolyVec_Len(polyvec));
+    }
     // R_Screen_DrawTriangles(&screen, triangles, TRIAG_CNT);
     // R_Screen_DrawTriangles(&screen, &triang, 1);
 
@@ -467,37 +477,33 @@ int main() {
     for (int i = 0; i < 6; ++i) {
         gravel_block_faces.face[i] = texture_gravel;
     }
-    polyvec = R_PolyVec_Init();
+    WORLD = VisibleWorld_Init();
     for (int i = 0; i < CHUNKS_COUNT; ++i) {
-        struct R_Chunk *c = CHUNKS + i;
-        c->pos = (ivec3_t){i, 0, 0};
-        c->data = malloc(sizeof(*c->data));
+        struct R_ChunkInstance *c = CHUNKS + i;
+        struct ChunkBase *c_base = malloc(sizeof(*c_base));
+        c_base->pos = (ivec3_t){i, 0, 0};
+        c_base->data = malloc(sizeof(*c_base->data));
         for (int x = 0; x < 16; ++x) {
             for (int y = 0; y < 16; ++y) {
                 for (int z = 0; z < 16; ++z) {
-                    c->data->blocks[x][y][z].block_type = R_BTYPE_AIR;
-                    c->data->blocks[x][y][z].faces = 0;
+                    if (y >= (1+i) && y <= (3+i) && z > 3 && z < 6) {
+                        c_base->data->blocks[x][y][z] = gravel_block;
+                    } else {
+                        c_base->data->blocks[x][y][z].block_type =
+                            BLOCKTYPE_AIR;
+                        c_base->data->blocks[x][y][z].faces = 0;
+                    }
                 }
             }
         }
+        c->base = c_base;
+        c->mesh = malloc(sizeof(*c->mesh));
+        c->mesh->dirty = false;
+        c->mesh->polys = R_PolyVec_Init();
+        VisibleWorld_PushChunk(WORLD, c_base);
     }
-    CHUNKS[0].data->blocks[0][0][0].block_type = R_BTYPE_SOLID;
-    CHUNKS[0].data->blocks[0][0][0].faces = &gravel_block_faces;
-    CHUNKS[0].data->blocks[0][1][0].block_type = R_BTYPE_SOLID;
-    CHUNKS[0].data->blocks[0][1][0].faces = &gravel_block_faces;
-    for (int x = 1; x < 9; ++x) {
-        for (int z = 1; z < 11; ++z) {
-            for (int y = 1; y < 3; ++y) {
-                if (y == 1 || (x == 1 || x == 8 || z == 1 || z == 10)) {
-                    CHUNKS[0].data->blocks[x][y][z].block_type = R_BTYPE_SOLID;
-                    CHUNKS[0].data->blocks[x][y][z].faces = &gravel_block_faces;
-                }
-            }
-        }
-    }
-    polyvec.vec.size = 0;
     for (int i = 0; i < CHUNKS_COUNT; ++i) {
-        R_Chunk_MakeBlockFaces(&polyvec, CHUNKS + i);
+        R_ChunkInstance_CalculateMesh(CHUNKS + i, WORLD);
     }
     // ---
 

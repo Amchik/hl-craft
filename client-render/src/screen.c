@@ -1,5 +1,6 @@
 #include "client-render/screen.h"
 #include "client-render/scene.h"
+#include "core/texture.h"
 #include "core/vector.h"
 #include <math.h>
 #include <stdio.h>
@@ -149,11 +150,8 @@ R_Screen_DrawTriangle_AsCamera(const struct R_Screen *restrict screen,
             float v = (w0 * v0 / z0 + w1 * v1 / z1 + w2 * v2 / z2) /
                       (w0 * (1 / z0) + w1 * (1 / z1) + w2 * (1 / z2));
 
-            int tx = (int)(u * 16) % 16;
-            int ty = (int)(v * 16) % 16;
-
             screen->buffer[y * screen->width + x] =
-                triangle->texture->texture[ty * 16 + tx];
+                texture_pixel(triangle->texture, u, v);
         }
     }
 }

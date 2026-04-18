@@ -1,29 +1,25 @@
 #pragma once
 
 #include "client-render/containers/triangle.h"
-#include "client-render/texture.h"
 #include "core/vector.h"
+#include "core/world/block.h"
+#include "core/world/chunk.h"
+#include "core/world/visible_world.h"
+#include <stdbool.h>
 
-enum R_BlockType {
-    R_BTYPE_AIR,
-    R_BTYPE_SOLID,
+struct R_ChunkMesh {
+    struct R_PolyVec polys;
+
+    bool dirty;
 };
 
-struct R_Block {
-    enum R_BlockType block_type;
-    struct R_BlockFaces *faces;
+struct R_ChunkInstance {
+    const struct ChunkBase *base;
+    struct R_ChunkMesh *mesh;
 };
 
-struct R_Chunk {
-    // Some big data that requires heap allocation
-    struct {
-        // [x][y][z]
-        struct R_Block blocks[16][16][16];
-    } *data;
-    ivec3_t pos;
-};
+void R_Block_MakeFacePolys(struct R_PolyVec *vec, struct Block *block,
+                           enum BlockFace face, ivec3_t block_pos);
 
-void R_Block_MakeFacePolys(struct R_PolyVec *vec, struct R_Block *block,
-                           enum R_Face face, ivec3_t block_pos);
-
-void R_Chunk_MakeBlockFaces(struct R_PolyVec *vec, const struct R_Chunk *chunk);
+void R_ChunkInstance_CalculateMesh(struct R_ChunkInstance *restrict instance,
+                                   const struct VisibleWorld *restrict world);
