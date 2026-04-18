@@ -256,7 +256,7 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
               "fps: %f, frametime: %ld ms, *render stats broken*",
               1000.0 / frametime, frametime);
     draw_text(work_buffer, 2, WIDTH, HEIGHT,
-              "[controls] WASD/arrows,[1] to reset pos, [0] to set to zero, "
+              "[controls] WASD/arrows, [1] to reset pos, [0] to set to zero, "
               "[-]/[=] change fov");
 
     memcpy(state->shm_buffer, work_buffer, WIDTH * HEIGHT * 4);
