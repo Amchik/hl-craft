@@ -26,28 +26,28 @@ void R_Block_MakeFacePolys(struct R_PolyVec *vec, struct R_Block *block,
         v3 = (vec3_t){x, y, z};
         break;
 
-    case R_FACE_PP:
+    case R_FACE_XP:
         v0 = (vec3_t){x + 1.0f, y, z};
         v1 = (vec3_t){x + 1.0f, y, z + 1.0f};
         v2 = (vec3_t){x + 1.0f, y + 1.0f, z + 1.0f};
         v3 = (vec3_t){x + 1.0f, y + 1.0f, z};
         break;
 
-    case R_FACE_PN:
+    case R_FACE_ZP:
         v0 = (vec3_t){x + 1.0f, y, z + 1.0f};
         v1 = (vec3_t){x, y, z + 1.0f};
         v2 = (vec3_t){x, y + 1.0f, z + 1.0f};
         v3 = (vec3_t){x + 1.0f, y + 1.0f, z + 1.0f};
         break;
 
-    case R_FACE_NP:
+    case R_FACE_XN:
         v0 = (vec3_t){x, y, z + 1.0f};
         v1 = (vec3_t){x, y, z};
         v2 = (vec3_t){x, y + 1.0f, z};
         v3 = (vec3_t){x, y + 1.0f, z + 1.0f};
         break;
 
-    case R_FACE_NN:
+    case R_FACE_ZN:
         v0 = (vec3_t){x, y, z};
         v1 = (vec3_t){x + 1.0f, y, z};
         v2 = (vec3_t){x + 1.0f, y + 1.0f, z};
