@@ -26,5 +26,6 @@ static inline void R_Screen_FromSceneProps(struct R_Screen *screen,
     screen->camera = props->camera;
 }
 
-void R_Screen_DrawTriangles(struct R_Screen *screen,
-                            struct R_Triangle *triangles, size_t count);
+void R_Screen_DrawTriangles(const struct R_Screen *restrict screen,
+                            const struct R_Triangle *restrict triangles,
+                            size_t count);

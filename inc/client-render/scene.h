@@ -34,23 +34,30 @@ static inline void R_SceneProps_Calculate(struct R_ScenePropsCalculated *calc,
     calc->frac_height_2 = props->height / 2.0;
 }
 
-static inline void R_Triag_ToCameraSpace(vec3_t *vs, vec3_t cam,
-                                         struct R_ScenePropsCalculated *calc) {
+static inline vec3_t
+R_VecToCameraSpace(vec3_t v, vec3_t cam,
+                   const struct R_ScenePropsCalculated *calc) {
+    float x0 = v.x - cam.x;
+    float y0 = v.y - cam.y;
+    float z0 = v.z - cam.z;
+    float x1 = x0 * calc->cos_yaw - z0 * calc->sin_yaw;
+    float z1 = x0 * calc->sin_yaw + z0 * calc->cos_yaw;
+    float y1 = y0 * calc->cos_pitch - z1 * calc->sin_pitch;
+    float z2 = y0 * calc->sin_pitch + z1 * calc->cos_pitch;
+    return (vec3_t){x1, y1, z2};
+}
+
+__attribute__((deprecated(
+    "use R_VecToCameraSpace for each array element"))) static inline void
+R_Triag_ToCameraSpace(vec3_t vs[restrict static 3], vec3_t cam,
+                      const struct R_ScenePropsCalculated *restrict calc) {
     for (int i = 0; i < 3; ++i) {
-        vec3_t v = vs[i];
-        float x0 = v.x - cam.x;
-        float y0 = v.y - cam.y;
-        float z0 = v.z - cam.z;
-        float x1 = x0 * calc->cos_yaw - z0 * calc->sin_yaw;
-        float z1 = x0 * calc->sin_yaw + z0 * calc->cos_yaw;
-        float y1 = y0 * calc->cos_pitch - z1 * calc->sin_pitch;
-        float z2 = y0 * calc->sin_pitch + z1 * calc->cos_pitch;
-        vs[i] = (vec3_t){x1, y1, z2};
+        vs[i] = R_VecToCameraSpace(vs[i], cam, calc);
     }
 }
 
 static inline vec2_t R_Triag_3D_to_2D(vec3_t point,
-                                       struct R_ScenePropsCalculated *calc) {
+                                      const struct R_ScenePropsCalculated *calc) {
     vec2_t r;
     r.x = point.x / point.z * calc->f + calc->frac_width_2;
     r.y = calc->frac_height_2 - point.y / point.z * calc->f;

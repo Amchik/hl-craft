@@ -242,11 +242,6 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
     //        triangles[i].texture = &texture_gravel;
     //    }
 
-    polyvec.vec.size = 0;
-    for (int i = 0; i < CHUNKS_COUNT; ++i) {
-        R_Chunk_MakeBlockFaces(&polyvec, CHUNKS + i);
-    }
-
     struct R_Screen screen;
     R_Screen_FromSceneProps(&screen, &sprops, work_buffer, z_buffer);
     R_Screen_DrawTriangles(&screen, polyvec.vec.ptr, R_PolyVec_Len(&polyvec));
@@ -499,6 +494,10 @@ int main() {
                 }
             }
         }
+    }
+    polyvec.vec.size = 0;
+    for (int i = 0; i < CHUNKS_COUNT; ++i) {
+        R_Chunk_MakeBlockFaces(&polyvec, CHUNKS + i);
     }
     // ---
 

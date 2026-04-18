@@ -65,11 +65,11 @@ static void draw_line(uint32_t *buffer, int width, int height, int x0, int y0,
 }
 
 // Draw triangle that projected as camera
-static void R_Screen_DrawTriangle_AsCamera(struct R_Screen *screen,
-                                           struct R_Triangle *triangle) {
-    vec3_t *vpos = triangle->v;
-    tvec2_t *tpos = triangle->t;
-
+static void
+R_Screen_DrawTriangle_AsCamera(const struct R_Screen *restrict screen,
+                               const struct R_Triangle *restrict triangle,
+                               vec3_t vpos[static restrict 3],
+                               tvec2_t tpos[static restrict 3]) {
     // skip if nothing from fov visible
     // FIXME: rewrite it
     int frustum_culling = 0;
@@ -158,11 +158,14 @@ static void R_Screen_DrawTriangle_AsCamera(struct R_Screen *screen,
     }
 }
 
-static void R_Screen_DrawTriangle(struct R_Screen *screen,
-                                  struct R_Triangle *triangle) {
-    R_Triag_ToCameraSpace(triangle->v, screen->camera, &screen->calc);
-    vec3_t *vpos = triangle->v;
-    tvec2_t *tpos = triangle->t;
+static void R_Screen_DrawTriangle(const struct R_Screen *restrict screen,
+                                  const struct R_Triangle *restrict triangle) {
+    vec3_t vpos[3];
+    vpos[0] = R_VecToCameraSpace(triangle->v[0], screen->camera, &screen->calc);
+    vpos[1] = R_VecToCameraSpace(triangle->v[1], screen->camera, &screen->calc);
+    vpos[2] = R_VecToCameraSpace(triangle->v[2], screen->camera, &screen->calc);
+    tvec2_t tpos[3];
+    memcpy(tpos, triangle->t, sizeof(tpos));
     float z0 = vpos[0].z;
     float z1 = vpos[1].z;
     float z2 = vpos[2].z;
@@ -225,29 +228,35 @@ static void R_Screen_DrawTriangle(struct R_Screen *screen,
 
         struct R_Triangle other;
         memcpy(&other, triangle, sizeof(*triangle));
-        other.color = 0xFF0000;
-        triangle->color = 0x00FF00;
+        // Debug wireframe
+        // other.color = 0xFF0000;
+        // triangle->color = 0x00FF00;
+        vec3_t o_vpos[3];
+        tvec2_t o_tpos[3];
+        memcpy(o_vpos, vpos, sizeof(vpos));
+        memcpy(o_tpos, tpos, sizeof(tpos));
 
         t = (Z_NEAR - b.z) / (invis.z - b.z);
         vec3_t p2;
         p2.x = b.x + t * (invis.x - b.x);
         p2.y = b.y + t * (invis.y - b.y);
         p2.z = Z_NEAR;
-        other.v[j] = b;
-        other.v[k] = p2; // <-- now it's (b, p2, p1)
-        other.t[j] = other.t[k];
-        other.t[k].u = tb.u + t * (tinvis.u - tb.u);
-        other.t[k].v = tb.v + t * (tinvis.v - tb.v);
+        o_vpos[j] = b;
+        o_vpos[k] = p2; // <-- now it's (b, p2, p1)
+        o_tpos[j] = o_tpos[k];
+        o_tpos[k].u = tb.u + t * (tinvis.u - tb.u);
+        o_tpos[k].v = tb.v + t * (tinvis.v - tb.v);
 
         // Draw other triangle
-        R_Screen_DrawTriangle_AsCamera(screen, &other);
+        R_Screen_DrawTriangle_AsCamera(screen, &other, o_vpos, o_tpos);
     }
 
-    R_Screen_DrawTriangle_AsCamera(screen, triangle);
+    R_Screen_DrawTriangle_AsCamera(screen, triangle, vpos, tpos);
 }
 
-void R_Screen_DrawTriangles(struct R_Screen *screen,
-                            struct R_Triangle *triangles, size_t count) {
+void R_Screen_DrawTriangles(const struct R_Screen *restrict screen,
+                            const struct R_Triangle *restrict triangles,
+                            size_t count) {
     if (count == 1) {
         R_Screen_DrawTriangle(screen, triangles);
         return;
