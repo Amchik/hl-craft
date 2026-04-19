@@ -4,57 +4,31 @@
 #include "core/world/block.h"
 #include "core/world/visible_world.h"
 
-void R_Block_MakeFacePolys(struct R_PolyVec *vec, struct Block *block,
+static const ivec3_t POLYS_OFFSETS[6][4] = {
+    [BLOCKFACE_TOP] = {{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}},
+    [BLOCKFACE_BOTTOM] = {{0, 0, 1}, {1, 0, 1}, {1, 0, 0}, {0, 0, 0}},
+    [BLOCKFACE_XP] = {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},
+    [BLOCKFACE_ZP] = {{1, 0, 1}, {0, 0, 1}, {0, 1, 1}, {1, 1, 1}},
+    [BLOCKFACE_XN] = {{0, 0, 1}, {0, 0, 0}, {0, 1, 0}, {0, 1, 1}},
+    [BLOCKFACE_ZN] = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}},
+};
+
+void R_Block_MakeFacePolys(struct R_PolyVec *restrict vec, const struct Block *restrict block,
                            enum BlockFace face, ivec3_t block_pos) {
-    float x = block_pos.x;
-    float y = block_pos.y;
-    float z = block_pos.z;
+    // я верю в векторизацию
+    // NOTE: тут наверное нужно сначала сделать float (vec3_t), а уже затем
+    // такой хренью заниматься
+    ivec3_t iv0, iv1, iv2, iv3;
+    iv0 = ivec3_add(block_pos, POLYS_OFFSETS[face][0]);
+    iv1 = ivec3_add(block_pos, POLYS_OFFSETS[face][1]);
+    iv2 = ivec3_add(block_pos, POLYS_OFFSETS[face][2]);
+    iv3 = ivec3_add(block_pos, POLYS_OFFSETS[face][3]);
 
     vec3_t v0, v1, v2, v3;
-
-    switch (face) {
-    case BLOCKFACE_TOP:
-        v0 = (vec3_t){x, y + 1.0f, z};
-        v1 = (vec3_t){x + 1.0f, y + 1.0f, z};
-        v2 = (vec3_t){x + 1.0f, y + 1.0f, z + 1.0f};
-        v3 = (vec3_t){x, y + 1.0f, z + 1.0f};
-        break;
-
-    case BLOCKFACE_BOTTOM:
-        v0 = (vec3_t){x, y, z + 1.0f};
-        v1 = (vec3_t){x + 1.0f, y, z + 1.0f};
-        v2 = (vec3_t){x + 1.0f, y, z};
-        v3 = (vec3_t){x, y, z};
-        break;
-
-    case BLOCKFACE_XP:
-        v0 = (vec3_t){x + 1.0f, y, z};
-        v1 = (vec3_t){x + 1.0f, y, z + 1.0f};
-        v2 = (vec3_t){x + 1.0f, y + 1.0f, z + 1.0f};
-        v3 = (vec3_t){x + 1.0f, y + 1.0f, z};
-        break;
-
-    case BLOCKFACE_ZP:
-        v0 = (vec3_t){x + 1.0f, y, z + 1.0f};
-        v1 = (vec3_t){x, y, z + 1.0f};
-        v2 = (vec3_t){x, y + 1.0f, z + 1.0f};
-        v3 = (vec3_t){x + 1.0f, y + 1.0f, z + 1.0f};
-        break;
-
-    case BLOCKFACE_XN:
-        v0 = (vec3_t){x, y, z + 1.0f};
-        v1 = (vec3_t){x, y, z};
-        v2 = (vec3_t){x, y + 1.0f, z};
-        v3 = (vec3_t){x, y + 1.0f, z + 1.0f};
-        break;
-
-    case BLOCKFACE_ZN:
-        v0 = (vec3_t){x, y, z};
-        v1 = (vec3_t){x + 1.0f, y, z};
-        v2 = (vec3_t){x + 1.0f, y + 1.0f, z};
-        v3 = (vec3_t){x, y + 1.0f, z};
-        break;
-    }
+    v0 = XVEC3(vec3_t, iv0);
+    v1 = XVEC3(vec3_t, iv1);
+    v2 = XVEC3(vec3_t, iv2);
+    v3 = XVEC3(vec3_t, iv3);
 
     tvec2_t uv0 = (tvec2_t){0.0f, 0.0f};
     tvec2_t uv1 = (tvec2_t){1.0f, 0.0f};
@@ -97,10 +71,7 @@ static const ivec3_t FACE_OFFSET_MAP[6] = {
 void R_ChunkInstance_CalculateMesh(struct R_ChunkInstance *restrict instance,
                                    const struct VisibleWorld *restrict world) {
     instance->mesh->polys.vec.size = 0;
-    ivec3_t chunk_start = instance->base->pos;
-    chunk_start.x *= 16;
-    chunk_start.y *= 16;
-    chunk_start.z *= 16;
+    const ivec3_t chunk_start = ivec3_mul(instance->base->pos, 16);
     for (int x = 0; x < 16; ++x) {
         for (int z = 0; z < 16; ++z) {
             for (int y = 0; y < 16; ++y) {
@@ -109,16 +80,18 @@ void R_ChunkInstance_CalculateMesh(struct R_ChunkInstance *restrict instance,
                     continue;
                 for (int i = 0; i < 6; ++i) {
                     ivec3_t dr = FACE_OFFSET_MAP[i];
-                    ivec3_t abs_pos = {chunk_start.x + x, chunk_start.y + y,
-                                       chunk_start.z + z};
+                    ivec3_t abs_pos = ivec3_add(chunk_start, (ivec3_t){
+                                                                 x,
+                                                                 y,
+                                                                 z,
+                                                             });
                     const struct Block *nb;
                     if (IN_CHUNK_BOUNDS_XYZ(x, y, z, dr))
                         nb = &instance->base->data
                                   ->blocks[x + dr.x][y + dr.y][z + dr.z];
                     else
-                        nb = VisibleWorld_GetBlockAt(
-                            world, (ivec3_t){abs_pos.x + dr.x, abs_pos.y + dr.y,
-                                             abs_pos.z + dr.z});
+                        nb = VisibleWorld_GetBlockAt(world,
+                                                     ivec3_add(abs_pos, dr));
                     if (!nb || nb->block_type != BLOCKTYPE_AIR)
                         continue;
                     R_Block_MakeFacePolys(&instance->mesh->polys, b, i,
