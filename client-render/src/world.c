@@ -43,6 +43,7 @@ void R_Block_MakeFacePolys(struct R_PolyVec *restrict vec, const struct Block *r
     t1.t[0] = uv0;
     t1.t[1] = uv1;
     t1.t[2] = uv2;
+    t1.face = face;
 
     struct R_Triangle t2 = {0};
     t2.texture = &block->faces->face[face];
@@ -52,6 +53,7 @@ void R_Block_MakeFacePolys(struct R_PolyVec *restrict vec, const struct Block *r
     t2.t[0] = uv0;
     t2.t[1] = uv2;
     t2.t[2] = uv3;
+    t2.face = face;
 
     R_PolyVec_Push(vec, &t1);
     R_PolyVec_Push(vec, &t2);
@@ -92,7 +94,7 @@ void R_ChunkInstance_CalculateMesh(struct R_ChunkInstance *restrict instance,
                     else
                         nb = VisibleWorld_GetBlockAt(world,
                                                      ivec3_add(abs_pos, dr));
-                    if (!nb || nb->block_type != BLOCKTYPE_AIR)
+                    if (nb && nb->block_type != BLOCKTYPE_AIR)
                         continue;
                     R_Block_MakeFacePolys(&instance->mesh->polys, b, i,
                                           abs_pos);

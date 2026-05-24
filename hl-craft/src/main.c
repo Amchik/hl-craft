@@ -25,8 +25,8 @@
 #include <xkbcommon/xkbcommon-keysyms.h>
 #include <xkbcommon/xkbcommon.h>
 
-#define WIDTH 800
-#define HEIGHT 600
+#define WIDTH 1280
+#define HEIGHT 720
 
 uint32_t gravel[] = {
     0x838383, 0xBEBEBE, 0x8C8C8C, 0xADADAD, 0xB2B2B2, 0xC2C2C2, 0x9F9F9F,
@@ -151,13 +151,14 @@ struct R_Triangle TRIANGLES[TRIAG_CNT + 0] = {
 
 #define Z_NEAR 0.01f
 
-#define DEF_CAMERA_POS {0, 1, -3}
+#define DEF_CAMERA_POS {14.7, 0.92, 5.14}
 struct R_SceneProps sprops = {.width = WIDTH,
                               .height = HEIGHT,
                               .camera = DEF_CAMERA_POS,
-                              .pitch = 0,
-                              .yaw = 0,
-                              .fov = 60};
+                              .pitch = 30.6,
+                              .yaw = 91.5,
+                              .fov = 60,
+                              .light_dir = (vec3_t){0.7, 1., 0.4}};
 uint32_t *work_buffer;
 float *z_buffer;
 float *z_buffer_INF;
@@ -197,6 +198,12 @@ void move_right(float len) {
     sprops.camera.z += right.z * len;
 }
 
+int frame_frametime_sum = 0;
+int frame_rendertime_sum = 0;
+int frame_frametime_cnt = 0;
+float last_frametime_avg = 0.0f;
+float last_rendertime_avg = 0.0f;
+
 static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
     struct client_state *state = data;
     wl_callback_destroy(cb);
@@ -213,6 +220,16 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
     if (frametime < (1000 / 60)) {
         wl_surface_commit(state->surface);
         return;
+    }
+    if (frame_frametime_cnt > 30) {
+        last_frametime_avg = (float)frame_frametime_sum / frame_frametime_cnt;
+        last_rendertime_avg = (float)frame_rendertime_sum / frame_frametime_cnt;
+        frame_frametime_cnt = 0;
+        frame_frametime_sum = 0;
+        frame_rendertime_sum = 0;
+    } else {
+        frame_frametime_sum += frametime;
+        frame_frametime_cnt++;
     }
 
     if (debug_rotate.x != 0) {
@@ -258,13 +275,16 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
     // R_Screen_DrawTriangles(&screen, triangles, TRIAG_CNT);
     // R_Screen_DrawTriangles(&screen, &triang, 1);
 
+    uint64_t render_time = current_time_ms() - now;
+    frame_rendertime_sum += render_time;
+
     draw_text(work_buffer, 0, WIDTH, HEIGHT,
               "x / y / z: %f %f %f | pitch=%f, yaw=%f | fov = %f",
               sprops.camera.x, sprops.camera.y, sprops.camera.z, sprops.pitch,
               sprops.yaw, sprops.fov);
     draw_text(work_buffer, 1, WIDTH, HEIGHT,
-              "fps: %f, frametime: %ld ms, *render stats broken*",
-              1000.0 / frametime, frametime);
+              "fps: %f, frametime: %.3ld ms (avg: %f), render time: %.3ld ms (avg: %f), *render stats broken*",
+              1000.0 / frametime, frametime, last_frametime_avg, render_time, last_rendertime_avg);
     draw_text(work_buffer, 2, WIDTH, HEIGHT,
               "[controls] WASD/arrows, [1] to reset pos, [0] to set to zero, "
               "[-]/[=] change fov");
@@ -486,7 +506,9 @@ int main() {
         for (int x = 0; x < 16; ++x) {
             for (int y = 0; y < 16; ++y) {
                 for (int z = 0; z < 16; ++z) {
-                    if (y >= (1+i) && y <= (3+i) && z > 3 && z < 6) {
+                    if ((i == 0 && x == 15) ||
+                        (i == 1 && (y > 3 && y < 5) && (z > 5 && z < 10))) {
+
                         c_base->data->blocks[x][y][z] = gravel_block;
                     } else {
                         c_base->data->blocks[x][y][z].block_type =

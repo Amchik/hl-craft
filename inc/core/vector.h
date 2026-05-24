@@ -1,5 +1,6 @@
 #pragma once
 
+#include <math.h>
 #include <stdint.h>
 
 typedef struct {
@@ -31,6 +32,14 @@ typedef struct {
 
 static inline vec3_t vec3_add(vec3_t a, vec3_t b) {
     return (vec3_t){a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+static inline vec3_t vec3_mul(vec3_t a, float k) {
+    return (vec3_t){k * a.x, k * a.y, k * a.z};
+}
+
+static inline float vec3_norm(vec3_t v) {
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
 static inline ivec3_t ivec3_add(ivec3_t a, ivec3_t b) {

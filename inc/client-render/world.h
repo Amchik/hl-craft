@@ -19,8 +19,8 @@ struct R_ChunkInstance {
 };
 
 void R_Block_MakeFacePolys(struct R_PolyVec *restrict vec,
-                           const struct Block *restrict block, enum BlockFace face,
-                           ivec3_t block_pos);
+                           const struct Block *restrict block,
+                           enum BlockFace face, ivec3_t block_pos);
 
 void R_ChunkInstance_CalculateMesh(struct R_ChunkInstance *restrict instance,
                                    const struct VisibleWorld *restrict world);

@@ -2,12 +2,14 @@
 
 #include "core/vector.h"
 #include "core/texture.h"
+#include "core/world/block.h"
 #include <math.h>
 
 struct R_Triangle {
     vec3_t v[3];
     tvec2_t t[3];
     uint32_t color;
+    enum BlockFace face;
     const struct AbstractTextureRef *texture;
 };
 
@@ -16,12 +18,14 @@ struct R_SceneProps {
     vec3_t camera;
     float pitch, yaw;
     float fov;
+    vec3_t light_dir;
 };
 struct R_ScenePropsCalculated {
     float sin_pitch, sin_yaw;
     float cos_pitch, cos_yaw;
     float f, tan_half_fov;
     float frac_width_2, frac_height_2;
+    float face_light[6];
 };
 
 static inline void R_SceneProps_Calculate(struct R_ScenePropsCalculated *calc,
@@ -32,6 +36,15 @@ static inline void R_SceneProps_Calculate(struct R_ScenePropsCalculated *calc,
     calc->f = (float)props->width / (2 * tanf(props->fov * M_PI / 180.0 / 2));
     calc->frac_width_2 = props->width / 2.0;
     calc->frac_height_2 = props->height / 2.0;
+    vec3_t light_dir = vec3_mul(props->light_dir, 1 / vec3_norm(props->light_dir));
+#define CLAMP(x, a, b) fmaxf(a, fminf(x, b))
+    calc->face_light[BLOCKFACE_TOP] = CLAMP(light_dir.y, 0.2f, 1.0f);
+    calc->face_light[BLOCKFACE_BOTTOM] = CLAMP(-light_dir.y, 0.2f, 1.0f);
+    calc->face_light[BLOCKFACE_XP] = CLAMP(light_dir.x, 0.2f, 1.0f);
+    calc->face_light[BLOCKFACE_ZP] = CLAMP(light_dir.z, 0.2f, 1.0f);
+    calc->face_light[BLOCKFACE_XN] = CLAMP(-light_dir.x, 0.2f, 1.0f);
+    calc->face_light[BLOCKFACE_ZN] = CLAMP(-light_dir.z, 0.2f, 1.0f);
+#undef CLAMP
 }
 
 static inline vec3_t

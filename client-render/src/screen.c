@@ -2,7 +2,9 @@
 #include "client-render/scene.h"
 #include "core/texture.h"
 #include "core/vector.h"
+#include <float.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,8 +71,8 @@ static void draw_line(uint32_t *buffer, int width, int height, int x0, int y0,
 static void
 R_Screen_DrawTriangle_AsCamera(const struct R_Screen *restrict screen,
                                const struct R_Triangle *restrict triangle,
-                               vec3_t vpos[static restrict 3],
-                               tvec2_t tpos[static restrict 3]) {
+                               const vec3_t vpos[static restrict 3],
+                               const tvec2_t tpos[static restrict 3]) {
     // skip if nothing from fov visible
     // FIXME: rewrite it
     int frustum_culling = 0;
@@ -90,14 +92,6 @@ R_Screen_DrawTriangle_AsCamera(const struct R_Screen *restrict screen,
         vs2d[j] = R_Triag_3D_to_2D(vpos[j], &screen->calc);
     }
 
-    // Draw wireframe because im lazy
-    //    draw_line(screen->buffer, screen->width, screen->height, vs2d[0].x,
-    //              vs2d[0].y, vs2d[1].x, vs2d[1].y, triangle->color);
-    //    draw_line(screen->buffer, screen->width, screen->height, vs2d[1].x,
-    //              vs2d[1].y, vs2d[2].x, vs2d[2].y, triangle->color);
-    //    draw_line(screen->buffer, screen->width, screen->height, vs2d[2].x,
-    //              vs2d[2].y, vs2d[0].x, vs2d[0].y, triangle->color);
-
     struct BoundingBox bb =
         get_bounding_box(vs2d[0], vs2d[1], vs2d[2],
                          (ivec2_t){.x = screen->width, .y = screen->height});
@@ -106,54 +100,63 @@ R_Screen_DrawTriangle_AsCamera(const struct R_Screen *restrict screen,
     if (area <= 0)
         return;
 
+    float z0 = vpos[0].z;
+    float z1 = vpos[1].z;
+    float z2 = vpos[2].z;
+
+    float fz0 = 1 / z0;
+    float fz1 = 1 / z1;
+    float fz2 = 1 / z2;
+
+    float u0 = tpos[0].u / z0;
+    float u1 = tpos[1].u / z1;
+    float u2 = tpos[2].u / z2;
+
+    float v0 = tpos[0].v / z0;
+    float v1 = tpos[1].v / z1;
+    float v2 = tpos[2].v / z2;
+
+    uint32_t face_light =
+        (uint32_t)(256.0f * screen->calc.face_light[triangle->face]);
+
     for (int32_t y = bb.min.y; y <= bb.max.y; ++y) {
         for (int32_t x = bb.min.x; x <= bb.max.x; ++x) {
             vec2_t p = {x, y};
-            // FIXME: так как я забыл про существование знака площади и вообще
-            // порядка вершин, чтобы отбрасывание было правильным, wX нужно
-            // домножить на sign(area). К тому же из-за рандомного порядка,
-            // backface culling не будет тут работать. Когда я исправлю эту
-            // ситуацию, нужно будет сделать backface culling и убрать деление
-            // на area (сделать его после проверки).
-            // NOTE: чисто технически, это результат того, что я так и не
-            // заботал поверхностные интегралы...
-            float w0 = edge(vs2d[1], vs2d[2], p) / area;
-            float w1 = edge(vs2d[2], vs2d[0], p) / area;
-            float w2 = edge(vs2d[0], vs2d[1], p) / area;
+            float w0 = edge(vs2d[1], vs2d[2], p);
+            float w1 = edge(vs2d[2], vs2d[0], p);
+            float w2 = edge(vs2d[0], vs2d[1], p);
             if (w0 < 0 || w1 < 0 || w2 < 0)
                 continue;
 
-            float z0 = vpos[0].z;
-            float z1 = vpos[1].z;
-            float z2 = vpos[2].z;
-
-            // BUG: благодаря отсутствию такой мелочи как backface culling,
-            // можно получить стрёмный баг, когда z-index работает неправильно.
-            // Я это пока не хочу фиксить, но как факт, если это сохранится даже
-            // с backface culling, то мб исправлю.
-            float z_real = w0 * z0 + w1 * z1 + w2 * z2;
+            float z_real = (w0 * z0 + w1 * z1 + w2 * z2) / area;
             if (z_real >= screen->zbuffer[y * screen->width + x])
                 continue;
             screen->zbuffer[y * screen->width + x] = z_real;
 
-            float u0 = tpos[0].u;
-            float u1 = tpos[1].u;
-            float u2 = tpos[2].u;
+            float u = (w0 * u0 + w1 * u1 + w2 * u2) /
+                      (w0 * fz0 + w1 * fz1 + w2 * fz2);
 
-            float v0 = tpos[0].v;
-            float v1 = tpos[1].v;
-            float v2 = tpos[2].v;
+            float v = (w0 * v0 + w1 * v1 + w2 * v2) /
+                      (w0 * fz0 + w1 * fz1 + w2 * fz2);
 
-            float u = (w0 * u0 / z0 + w1 * u1 / z1 + w2 * u2 / z2) /
-                      (w0 * (1 / z0) + w1 * (1 / z1) + w2 * (1 / z2));
+            uint32_t clr = texture_pixel(triangle->texture, u, v);
+            uint32_t clr_rb = clr & 0x00FF00FF;
+            uint32_t clr_g = clr & 0x0000FF00;
 
-            float v = (w0 * v0 / z0 + w1 * v1 / z1 + w2 * v2 / z2) /
-                      (w0 * (1 / z0) + w1 * (1 / z1) + w2 * (1 / z2));
+            clr_rb = ((clr_rb * face_light) >> 8) & 0x00FF00FF;
+            clr_g = ((clr_g * face_light) >> 8) & 0x0000FF00;
 
-            screen->buffer[y * screen->width + x] =
-                texture_pixel(triangle->texture, u, v);
+            screen->buffer[y * screen->width + x] = clr_rb | clr_g;
         }
     }
+
+    // Draw wireframe because im lazy
+    //    draw_line(screen->buffer, screen->width, screen->height, vs2d[0].x,
+    //              vs2d[0].y, vs2d[1].x, vs2d[1].y, triangle->color);
+    //    draw_line(screen->buffer, screen->width, screen->height, vs2d[1].x,
+    //              vs2d[1].y, vs2d[2].x, vs2d[2].y, triangle->color);
+    //    draw_line(screen->buffer, screen->width, screen->height, vs2d[2].x,
+    //              vs2d[2].y, vs2d[0].x, vs2d[0].y, triangle->color);
 }
 
 static void R_Screen_DrawTriangle(const struct R_Screen *restrict screen,
