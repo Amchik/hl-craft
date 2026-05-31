@@ -5,6 +5,7 @@
 #include "core/vector.h"
 #include "core/world/chunk.h"
 #include "core/world/visible_world.h"
+#include "core/xorshift.h"
 #include "input-helper.h"
 #include "xdg-shell-client-protocol.h"
 #include <X11/keysymdef.h>
@@ -27,6 +28,19 @@
 
 #define WIDTH 1280
 #define HEIGHT 720
+
+uint32_t noisebg[WIDTH * HEIGHT];
+
+static inline void noisebg_fill(uint32_t *buff) {
+    uint32_t state = 123;
+    for (int i = 0; i < WIDTH * HEIGHT; ++i) {
+        state = xorshift32(state);
+        uint8_t g = state & 0xf;
+        uint8_t r = g + 16;
+        uint8_t b = g + 16;
+        buff[i] = (r << 16) | (g << 8) | b;
+    }
+}
 
 uint32_t gravel[] = {
     0x838383, 0xBEBEBE, 0x8C8C8C, 0xADADAD, 0xB2B2B2, 0xC2C2C2, 0x9F9F9F,
@@ -105,8 +119,10 @@ struct client_state {
 __attribute__((format(printf, 5, 6))) void
 draw_text(void *buffer, int line, int width, int height, char *fmt, ...) {
     line++;
-    cairo_surface_t *surface = cairo_image_surface_create_for_data(
-        buffer, CAIRO_FORMAT_ARGB32, width, height, width * 4);
+    static cairo_surface_t *surface = 0;
+    if (surface == 0)
+        surface = cairo_image_surface_create_for_data(
+            buffer, CAIRO_FORMAT_ARGB32, width, height, width * 4);
 
     cairo_t *cr = cairo_create(surface);
 
@@ -130,7 +146,6 @@ draw_text(void *buffer, int line, int width, int height, char *fmt, ...) {
     cairo_show_text(cr, buff);
 
     cairo_destroy(cr);
-    cairo_surface_destroy(surface);
 }
 
 uint64_t current_time_ms() {
@@ -203,14 +218,21 @@ int frame_rendertime_sum = 0;
 int frame_frametime_cnt = 0;
 float last_frametime_avg = 0.0f;
 float last_rendertime_avg = 0.0f;
+int frame_frametime_worst = 0;
+int frame_rendertime_worst = 0;
+int frame_frametime_worst_svd = 0;
+int frame_rendertime_worst_svd = 0;
+int frame_worst_cnt = 0;
 
 static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
     struct client_state *state = data;
-    wl_callback_destroy(cb);
     state->frame_callback = NULL;
 
     uint64_t now = current_time_ms();
     uint64_t frametime = now - state->render_since;
+
+    if (frame_frametime_worst < frametime)
+        frame_frametime_worst = frametime;
 
     // Request next frame
     state->frame_callback = wl_surface_frame(state->surface);
@@ -227,6 +249,13 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
         frame_frametime_cnt = 0;
         frame_frametime_sum = 0;
         frame_rendertime_sum = 0;
+        if (++frame_worst_cnt > 10) {
+            frame_frametime_worst_svd = frame_frametime_worst;
+            frame_rendertime_worst_svd = frame_rendertime_worst;
+            frame_frametime_worst = 0;
+            frame_rendertime_worst = 0;
+            frame_worst_cnt = 0;
+        }
     } else {
         frame_frametime_sum += frametime;
         frame_frametime_cnt++;
@@ -255,7 +284,7 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
     }
 
     state->render_since = now;
-    memset(work_buffer, 0, WIDTH * HEIGHT * 4);
+    memcpy(work_buffer, noisebg, sizeof(noisebg));
     memcpy(z_buffer, z_buffer_INF, WIDTH * HEIGHT * sizeof(float));
 
     //    struct R_Triangle triangles[TRIAG_CNT];
@@ -277,14 +306,19 @@ static void frame_done(void *data, struct wl_callback *cb, uint32_t time) {
 
     uint64_t render_time = current_time_ms() - now;
     frame_rendertime_sum += render_time;
+    if (frame_rendertime_worst < render_time)
+        frame_rendertime_worst = render_time;
 
     draw_text(work_buffer, 0, WIDTH, HEIGHT,
               "x / y / z: %f %f %f | pitch=%f, yaw=%f | fov = %f",
               sprops.camera.x, sprops.camera.y, sprops.camera.z, sprops.pitch,
               sprops.yaw, sprops.fov);
     draw_text(work_buffer, 1, WIDTH, HEIGHT,
-              "fps: %f, frametime: %.3ld ms (avg: %f), render time: %.3ld ms (avg: %f), *render stats broken*",
-              1000.0 / frametime, frametime, last_frametime_avg, render_time, last_rendertime_avg);
+              "fps: %f, frametime: %.3ld ms (avg: %f, worst: %d), render time: "
+              "%.3ld ms (avg: %f, worst: %d), *render stats broken*",
+              1000.0 / frametime, frametime, last_frametime_avg,
+              frame_frametime_worst_svd, render_time, last_rendertime_avg,
+              frame_rendertime_worst_svd);
     draw_text(work_buffer, 2, WIDTH, HEIGHT,
               "[controls] WASD/arrows, [1] to reset pos, [0] to set to zero, "
               "[-]/[=] change fov");
@@ -489,6 +523,7 @@ static const struct wl_registry_listener registry_listener = {
 int main() {
     // render
     work_buffer = malloc(WIDTH * HEIGHT * 4);
+    noisebg_fill(noisebg);
     z_buffer = malloc(WIDTH * HEIGHT * sizeof(float));
     z_buffer_INF = malloc(WIDTH * HEIGHT * sizeof(float));
     for (int i = 0; i < WIDTH * HEIGHT; ++i) {
